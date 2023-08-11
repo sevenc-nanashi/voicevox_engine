@@ -391,7 +391,7 @@ jobs:
 
           curl -L https://github.com/upx/upx/releases/download/v4.1.0/upx-4.1.0-win64.zip -o upx-4.1.0-win64.zip
           unzip upx-4.1.0-win64.zip
-          echo "$(pwd)/upx-4.1.0-win64" >> $GITHUB_PATH
+          echo "$(cygpath -w "$PWD/upx-4.1.0-win64")" > upx_path.txt
 
       # Download VOICEVOX RESOURCE
       - name: Prepare VOICEVOX RESOURCE cache
