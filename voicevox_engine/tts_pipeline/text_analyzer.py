@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from itertools import chain
 from typing import Callable, Literal, Self
+import e2k
 
 import pyopenjtalk
 
@@ -358,9 +359,68 @@ def _utterance_to_accent_phrases(utterance: UtteranceLabel) -> list[AccentPhrase
     ]
 
 
+# - 4文字以上
+# - 先頭が大文字/小文字、それ以降が小文字
+convertable = re.compile(r"[a-zA-Z][a-z]{3,}")
+
+
+c2k: e2k.C2K | None = None
+
+
+def text_to_features_with_e2k(
+    text: str,
+) -> list[str]:
+    """e2kを用いて不明な英単語をカタカナに変換してからフルコンテキストラベルを生成する"""
+    global c2k
+    njd_features = pyopenjtalk.run_frontend(text)
+    for i, feature in enumerate(njd_features):
+        if feature["pos"] != "フィラー" or feature["chain_rule"] != "*":
+            continue
+
+        if c2k is None:
+            c2k = e2k.C2K()
+
+        hankaku = _convert_to_hankaku(feature["string"])
+        if convertable.fullmatch(hankaku):
+            kana = c2k(hankaku)
+            print(f"e2k: {hankaku} -> {kana}")
+
+            rule_others = (
+                "[イ][ェ]|[ヴ][ャュョ]|[ウクグトド][ゥ]|[テデ][ィェャュョ]|[クグ][ヮ]"
+            )
+            rule_line_i = "[キシチニヒミリギジヂビピ][ェャュョ]|[キニヒミリギビピ][ィ]"
+            rule_line_u = "[クツフヴグ][ァ]|[ウクスツフヴグズ][ィ]|[ウクツフヴグ][ェォ]"
+            rule_one_mora = "[ァ-ヴー]"
+            njd_features[i] = {
+                "string": kana,
+                "pos": "名詞",
+                "pos_group1": "固有名詞",
+                "pos_group2": "一般",
+                "pos_group3": "*",
+                "ctype": "*",
+                "cform": "*",
+                "orig": feature["string"],
+                "read": kana,
+                "pron": kana,
+                "acc": 1,
+                "mora_size": len(
+                    re.findall(
+                        f"(?:{rule_others}|{rule_line_i}|{rule_line_u}|{rule_one_mora})",
+                        kana,
+                    )
+                ),
+                "chain_rule": "*",
+                "chain_flag": -1,
+            }
+
+    return pyopenjtalk.make_label(njd_features)
+
+
 def text_to_accent_phrases(
     text: str,
-    text_to_features: Callable[[str], list[str]] = pyopenjtalk.extract_fullcontext,
+    text_to_features: Callable[
+        [str], list[str]
+    ] = text_to_features_with_e2k,  # pyopenjtalk.extract_fullcontext,
 ) -> list[AccentPhrase]:
     """日本語文からアクセント句系列を生成する"""
     if len(text.strip()) == 0:
@@ -374,3 +434,12 @@ def text_to_accent_phrases(
     accent_phrases = _utterance_to_accent_phrases(utterance)
 
     return accent_phrases
+
+
+def _convert_to_hankaku(surface: str) -> str:
+    return surface.translate(
+        str.maketrans(
+            "".join(chr(0xFF01 + i) for i in range(94)),
+            "".join(chr(0x21 + i) for i in range(94)),
+        )
+    )

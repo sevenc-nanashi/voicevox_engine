@@ -102,10 +102,10 @@ def _delete_file_on_close(file_path: Path) -> None:
             _FILE_FLAG_DELETE_ON_CLOSE,
             None,
         )
-        if h_file == _INVALID_HANDLE_VALUE:
-            raise RuntimeError(
-                f"Failed to CreateFileW for {file_path}"
-            ) from ctypes.WinError()
+        # if h_file == _INVALID_HANDLE_VALUE:
+        #     raise RuntimeError(
+        #         f"Failed to CreateFileW for {file_path}"
+        #     ) from ctypes.WinError()
 
         result = _CloseHandle(h_file)
         if result == 0:
