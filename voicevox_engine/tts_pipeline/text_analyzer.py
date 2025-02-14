@@ -359,9 +359,9 @@ def _utterance_to_accent_phrases(utterance: UtteranceLabel) -> list[AccentPhrase
     ]
 
 
-# - 4文字以上
+# - 3文字以上
 # - 先頭が大文字/小文字、それ以降が小文字
-convertable = re.compile(r"[a-zA-Z][a-z]{3,}")
+convertable = re.compile(r"[a-zA-Z][a-z]{2,}")
 
 
 c2k: e2k.C2K | None = None
@@ -382,7 +382,8 @@ def text_to_features_with_e2k(
 
         hankaku = _convert_to_hankaku(feature["string"])
         if convertable.fullmatch(hankaku):
-            kana = c2k(hankaku)
+            # c2kは小文字の方が正確な変換を行う
+            kana = c2k(hankaku.lower())
             print(f"e2k: {hankaku} -> {kana}")
 
             rule_others = (
